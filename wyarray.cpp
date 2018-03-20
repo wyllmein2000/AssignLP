@@ -68,6 +68,18 @@
    return y;
 }
 // ===================================================================
+   int vector_max_index (double *x, int n) {
+   int k=0;
+   double y=x[0];
+   for (int i=1; i<n; i++) {
+       if (y<x[i]) {
+          y=x[i];
+          k=i;
+       }
+   }
+   return k;
+}
+// ===================================================================
    double dot_product (double *a, double *b, int n) {
       double y = 0.0;
       for (int i=0; i<n; i++)
@@ -81,6 +93,6 @@
       double y = 0.0;
       for (int i=0; i<n; i++)
           y += x[i]*x[i];
-      return sqrt(y/n);
+      return sqrt(y)/n;
    }
 // ===================================================================

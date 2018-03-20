@@ -1,11 +1,16 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <stdio.h>
 #include <stdlib.h>
+#include <set>
+#include <map>
 #include "inout.h"
 using namespace std;
 
+inout::inout () {
+}
 
 void inout::readtext_example (double *score, int nuser, int nmsg, int minMsgId) {
    ifstream inf;
@@ -56,6 +61,11 @@ void inout::readtext_example (double *score, int nuser, int nmsg, int minMsgId) 
 
 }
 
+
+
+
+
+
 void inout::printArray(double *x, int n) {
    for (int i = 0; i < n; i ++) {
        cout << "[" << i << "]=" << x[i] << endl;
@@ -75,10 +85,6 @@ void inout::printArray2d(double *x, int n, int m) {
 	   cout << "[" << i << "][" << j << "]=" << x[i*m+j] << endl;
        }
    }
-}
-
-
-void inout::writeDataText() {
 }
 
 

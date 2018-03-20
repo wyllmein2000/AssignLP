@@ -10,6 +10,8 @@ double **matrix2d_init_double (double a, int m, int n);
 
 double norm2 (double *x, int n);
 
+
+int vector_max_index (double *x, int n);
 double vector_amax (double *, int);
 double vector_min (double *x, int n);
 double vector_sum (double *a, int n);
