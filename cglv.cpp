@@ -10,11 +10,13 @@
 using namespace std;
 
 
-SolverCG::SolverCG (double eps, double wns, int niter, int nm) {
+//SolverCG::SolverCG (double eps, double wns, int niter, PDMtrFunc *ass) {
+SolverCG::SolverCG (double eps, double wns, int niter, PDMatrix *ass) {
    this->eps = eps;
    this->wns = wns;
    this->niter = niter;
-   this->nm = nm;
+   this->ass = ass;
+   this->nm = ass->nm;
 }
 
 
@@ -39,13 +41,9 @@ void SolverCG::cgstabilize (double *y, double *x) {
 // G*x=t
 // G'Gx=G't
 // Ax=b
-// s0 as an initial guess
-// t as known data
-// 
-// Input:  x0, b
-// Output: x=s=1/v
 // ===================================================================
-void SolverCG::CgsWy (double *x, double *x0, double *b, assign &ass) {
+//void SolverCG::CgsWy (double *x, double *x0, double *b, PDMtrFunc *ass) {
+void SolverCG::CgsWy (double *x, double *x0, double *b) {
 
    double alpha, beta;
    double r1, r2, b2;
@@ -53,9 +51,8 @@ void SolverCG::CgsWy (double *x, double *x0, double *b, assign &ass) {
    double *r = new double[nm];
    double *p = new double[nm];
 
-   // obtain y=A(v0)*v0
-   // printf("   *** \n");
-   ass.op(y, x0);
+   ass->Opr(y, x0);
+   //Op(y, x0);
    for (int k=0; k<nm; k++) {
        r[k]=b[k]-y[k];
        p[k]=r[k];
@@ -64,17 +61,16 @@ void SolverCG::CgsWy (double *x, double *x0, double *b, assign &ass) {
 
    r2=dot_product(r,r,nm);
    b2=dot_product(b,b,nm);
-   // printf("   *** %f %f\n",r2,b2);
 
    // printf("   *** CG starts \n");
    for (int k=0; k<this->niter; k++) {
 
       //if (k%5==0) 
-      // printf(" *** iter=%d, eps=%f\n", k+1, sqrt(r2/b2));
+      //printf(" *** iter=%d, eps=%f\n", k+1, sqrt(r2/b2));
       if (r2<b2*this->eps*this->eps) break;
 
-      // obtain y=G'(p)*G(p)*p
-      ass.op(y, p);
+      ass->Opr(y, p);
+      //Op(y, p);
 
       r1=r2;
       alpha=r1/dot_product(p,y,nm);
@@ -94,7 +90,7 @@ void SolverCG::CgsWy (double *x, double *x0, double *b, assign &ass) {
    delete [] p;
 } 
 // ===================================================================
-void SolverCG::cgsly (double *x, double *x0, double *b, assign ass) {
+void SolverCG::cgsly (double *x, double *x0, double *b, PDMtrFunc ass) {
 
    double alpha, beta;
    double r1, r2, b2;
@@ -110,7 +106,7 @@ void SolverCG::cgsly (double *x, double *x0, double *b, assign ass) {
    printf("   *** \n");
 
    //op (y,x);
-   ass.op(y, x);
+   ass.Opr(y, x);
    cgstabilize (y,x);
 
    char istr[3];
@@ -138,7 +134,7 @@ void SolverCG::cgsly (double *x, double *x0, double *b, assign ass) {
       if (r2<b2*this->eps*this->eps) break;
 
       // obtain y=G'(p)*G(p)*p
-      ass.op(y, p);
+      ass.Opr(y, p);
       cgstabilize (y,p);
 
 
@@ -165,7 +161,7 @@ void SolverCG::cgsly (double *x, double *x0, double *b, assign ass) {
 
       //
       if (k%150==148) {
-         ass.op(y, x);
+         ass.Opr(y, x);
          cgstabilize (y,x);
          VectorSub (r,b,y,nm);
       }
@@ -370,7 +366,7 @@ void SolverCG::bcgswy (double *x, double *x0, double *b, double wns, double eps,
 
 
 // ===================================================================
-void SolverCG::CheckCgsOp (assign &ass) {
+void SolverCG::CheckCgsOp () {
 
    int n = this->nm;
    double *x1 = (double *)malloc(n*sizeof(double));
@@ -385,8 +381,8 @@ void SolverCG::CheckCgsOp (assign &ass) {
    }
 
 // printf("hello\n");
-   ass.op (y1,x1);     /* y1 = A x1 */
-   ass.op (y2,x2);     /* y2 = A x2 */
+   ass->Opr (y1,x1);     /* y1 = A x1 */
+   ass->Opr (y2,x2);     /* y2 = A x2 */
 
 // printf("hellu\n");
    double z1=dot_product(x1,y2,n);
@@ -412,132 +408,3 @@ void SolverCG::CheckCgsOp (assign &ass) {
    free(y2);
 }
 // ===================================================================
-/*
-   void checksym (int n, double (*op)(double*, double*)) {
-
-   double *x1 = (double *)malloc(n*sizeof(double));
-   double *y1 = (double *)malloc(n*sizeof(double));
-   double *x2 = (double *)malloc(n*sizeof(double));
-   double *y2 = (double *)malloc(n*sizeof(double));
-
-   srand((unsigned)time(NULL));
-   for (int k=0; k<n; k++) {
-       x1[k] = rand()/(RAND_MAX+1.0);
-       x2[k] = rand()/(RAND_MAX+1.0);
-   }
-
-   op (y1,x1);
-   op (y2,x2);
-
-
-   double z1=dot_product(x1,y2,n);
-   double z2=dot_product(x2,y1,n);
-
-   printf("y2'*x1= %f\n",z1); 
-   printf("y1'*x2= %f\n",z2); 
-  
-   free(x1);
-   free(y1);
-   free(x2);
-   free(y2);
-}*/
-// ===================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ===================================================================
-   int m=4;
-   int n=5;
-   double **g=matrix2d_init_double(0.0,m,n);
-// ===================================================================
-// y=g'x
-// ===================================================================
-void SolverCG::matadj (double *y, double *x) {
-   for (int i=0; i<n; i++) {
-       y[i]=0.0;
-       for (int j=0; j<m; j++)
-           y[i] += g[j][i]*x[j];
-   }
-}
-// ===================================================================
-void SolverCG::matop (double *y, double *x) {
-   double *z=vector_init_double(0.0,m);
-   M2dVecMul (z,g,x,m,n);
-   matadj (y,z);
-   free(z);
-}
-// ===================================================================
-void SolverCG::checkcgs () {
-
-   int niter=10;
-   double eps=0.01;
-   double wns=0.01;
-
-   double *x=vector_init_double(0.0,n);
-   double *t=vector_init_double(0.0,m);
-
-   for (int i=0; i<n; i++) {
-       for (int j=0; j<m; j++)
-           g[j][i]=2*j+i-5.0;
-       x[i]=i; 
-   }
-
-   M2dVecMul(t,g,x,m,n);
-
-   double *x0=vector_init_double(0.0,n);
-   double xa=vector_sum(x,n)/n;
-   for (int i=0; i<n; i++) x0[i]=xa;
-
-   double *b=vector_init_double(0.0,n);
-   matadj (b,t);
-
-   double *xx=vector_init_double(0.0,n);
-
-// ---
-   //cgswy (xx,x0,b,eps,niter,n,matop);
-   printf("  cgs wuyan: \n");
-   for (int i=0; i<n; i++)
-       printf("i=%d,%f,%f\n",i,x[i],xx[i]);
-
-// ---
-   printf("  cgs luoyi: \n");
-   memset(xx,0,n*sizeof(double));
-   //cgsly (xx,x0,b,wns,eps,niter,n,matop);
-   for (int i=0; i<n; i++)
-       printf("i=%d,%f,%f\n",i,x[i],xx[i]);
-
-// ---
-   printf("  cgs mayue: \n");
-   memset(xx,0,n*sizeof(double));
-   //cgsmy (xx,x0,b,wns,eps,niter,n,matop);
-   for (int i=0; i<n; i++)
-       printf("i=%d,%f,%f\n",i,x[i],xx[i]);
-
-  
-// ---
-   printf("  bcgs wuyan: \n");
-   memset(xx,0,n*sizeof(double));
-   //bcgswy (xx,x0,b,wns,eps,niter,n,matop);
-   for (int i=0; i<n; i++)
-       printf("i=%d,%f,%f\n",i,x[i],xx[i]);
-
-
-}
-// ===================================================================
-// ===================================================================
-  
