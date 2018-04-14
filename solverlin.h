@@ -29,6 +29,11 @@ class SolverLin {
 	void GetRhsBC(double *, double *, double *, double *, double *);
 	void EstimateDr(double *, double *, double *);
 	void UpdateXVS(double *, double *, double *, double *, double *, double *);
+
+        void kktopr(double *, double *, double *, double *, double *, double *);
+        void kktrhs(double *, double *, double *, double *, double *, double *, int);
+        void kktcheck(double *, double *, double *, double *, double *, double *, int);
+
 	void InnerPoint (double *, double *, double *, double *, double *);
 
         void TestPCG(SolverPCG *sol);

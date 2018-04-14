@@ -125,17 +125,6 @@ void ReaderFileAss::readScoreFromFile () {
       // cout << usrId.c_str() << " " << msgId.c_str() << endl;
    }
    inf.close();
-
-
-   // normalize
-   double sm = 0.0;
-   for (int i = 0; i < this->ns; i ++) {
-       if (sm < score[i]) sm = score[i];
-   }
-   for (int i = 0; i < this->ns; i ++) {
-       score[i] /= sm;
-   }
-
 }
 
 void ReaderFileAss::readTargetFromFile () {
@@ -159,7 +148,7 @@ void ReaderFileAss::readTargetFromFile () {
 
    while (!inf.eof()) {
       k += 1;
-      if (k > nmsg) break;
+      if (k > maxLine) break;
 
       getline(inf, line);
 
@@ -199,7 +188,7 @@ void ReaderFileAss::printTarget () {
    for (int imsg = 0; imsg < nmsg; imsg ++) {
        msg_score = 0;	
        for (int iusr = 0; iusr < nusr; iusr ++) 
-	   msg_score += score[iusr * nmsg + imsg];
+	   msg_score += score[iusr * nmsg + iusr];
        cout << imsg << " " << id2msg[imsg].c_str() << " " << msg_score << " " << bottom[imsg] << " " << upper[imsg] << " " << target[imsg] << endl;
    }
 }

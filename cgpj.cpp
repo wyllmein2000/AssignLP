@@ -142,27 +142,36 @@ void SolverPCG::ProjCG (double *x, double *v, double *c, double *b) {
 
       //if (k%5==0) 
       //cout << " r2=" << r2 << " b2=" << b2 << endl;
-      //printf(" *** iter=%d, eps=%f\n", k+1, sqrt(r2/b2));
-      if (r2<b2*this->eps*this->eps) break;
+      //printf(" *** iter=%d, r2=%f\n", k, r2);
+      if (sqrt(fabs(r2))<eps) break;
 
       ass->G_opr(y, p);
-      //ass->PrintVector(y, nm, "PCG ProjCG y");
+
+      if (iprint == 1)
+         ass->PrintVector(y, nm, "PCG ProjCG y");
 
       r1 = r2;
       alpha = r1 / dot_product(p,y,nm);
-      if (iprint == 1) cout << "alpha=" << alpha << endl;
+
+      if (iprint == 1) 
+	 cout << "alpha=" << alpha << endl;
 
       for (int i=0; i<nm; i++) {
           x[i] = x[i] + alpha * p[i];
           r[i] = r[i] + alpha * y[i];
       }
-      if (iprint == 1) ass->PrintVector(r, nm, "PCG ProjCG r");
+      if (iprint == 1) 
+	 ass->PrintVector(r, nm, "PCG ProjCG r");
 
       this->ProjOpr(g, r);
-      if (iprint == 1) ass->PrintVector(g, nm, "PCG ProjCG g");
+
+      if (iprint == 1)
+         ass->PrintVector(g, nm, "PCG ProjCG g");
 
       r2 = dot_product(r, g, nm);
-      if (iprint == 1) cout << "PCG ProjCG r1=" << r1 << " r2=" << r2 << endl;
+
+      if (iprint == 1)
+	 cout << "PCG ProjCG r1=" << r1 << " r2=" << r2 << endl;
 
       beta = r2 / r1;
 

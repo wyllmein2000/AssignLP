@@ -24,7 +24,7 @@ SolverLin::SolverLin (KKTlp *ass) {
     this->outer = 5;
     this->niter = 5;
     this->mu = 0.6;
-    this->eta = 0.9;
+    this->eta = 0.1;
 
     this->iprint = 1;
     this->ass = ass;
@@ -34,6 +34,11 @@ SolverLin::SolverLin (KKTlp *ass) {
 }
 
 
+/*
+ * x0 = A'inv(AA')b
+ * v0 = inv(AA')Ac
+ * s0 = c - A'v0
+ */
 void SolverLin::GetInitPoint (double *x, double *v, double *s, double *b, double *c, SolverPCG *solpcg) {
 
     double *p = new double[m];
@@ -70,6 +75,7 @@ void SolverLin::GetInitPoint (double *x, double *v, double *s, double *b, double
 	ssum += s[i];
     }
 
+    /*
     double pxs = dot_product(x, s, n);
     delx = 0.5 * pxs / ssum;
     dels = 0.5 * pxs / xsum;
@@ -77,7 +83,7 @@ void SolverLin::GetInitPoint (double *x, double *v, double *s, double *b, double
     for (int i = 0; i < n; i ++) {
 	x[i] += delx;
 	s[i] += dels;
-    }
+    } */
     delete [] p;
 }
 
@@ -158,8 +164,8 @@ void SolverLin::EstimateDr (double *dr, double *dx, double *ds) {
 }
 
 void SolverLin::UpdateXVS (double *x1, double *v1, double *s1, double *dx, double *dv, double *ds) {
-    double alpha_pri = 100.0;
-    double alpha_dual= 100.0;
+    double alpha_pri = 1.0 / this->eta;
+    double alpha_dual= 1.0 / this->eta;
     double alpha;
     for (int i = 0; i < n; i ++) {
          if (dx[i] < 0) {
@@ -185,6 +191,66 @@ void SolverLin::UpdateXVS (double *x1, double *v1, double *s1, double *dx, doubl
     for (int i = 0; i < m; i ++) {
         v1[i] = ass->v0[i] + alpha_dual * dv[i];
     }
+}
+
+
+/* original matrix operation */
+/* |0  A'  I| |dx|  |A'v+s-c|  |Rc |
+ * |A  0   0|*|dv|=-|Ax-b   |=-|Rb |
+ * |Ds 0  Dx| |ds|  |Ds*Dx*e|  |Rse|
+ */
+void SolverLin::kktopr(double *Rc, double *Rb, double *Rse, double *dx, double *dv, double *ds) {
+   memset(Rc, 0, n * sizeof(double));
+   memset(Rb, 0, m * sizeof(double));
+   memset(Rse, 0, n * sizeof(double));
+
+   ass->Adjoint(Rc, dv);
+   VectorAdd(Rc, Rc, ds, -1.0, -1.0, n);
+
+   ass->Forward(Rb, dx);
+   VectorAdd(Rb, Rb, Rb, -1.0,  0.0, m);
+
+   for (int i = 0; i < n; i ++)
+       Rse[i] = - ass->s0[i] * dx[i] - ass->x0[i] * ds[i];
+}
+
+void SolverLin::kktrhs(double *Rc, double *Rb, double *Rse, double *dr, double *b, double *c, int flag) {
+   memset(Rc, 0, n * sizeof(double));
+   memset(Rb, 0, m * sizeof(double));
+   memset(Rse, 0, n * sizeof(double));
+
+   ass->Adjoint(Rc, ass->v0); 
+   for (int i = 0; i < n; i ++)
+       Rc[i] = Rc[i] + ass->s0[i] - c[i];
+
+   ass->Forward(Rb, ass->x0); 
+   for (int i = 0; i < m; i ++)
+       Rb[i] = Rb[i] - b[i];
+
+   for (int i = 0; i < n; i ++)
+       Rse[i] = ass->s0[i] * ass->x0[i];
+
+   if (flag == 1) {
+      for (int i = 0; i < n; i ++)
+          Rse[i] = ass->s0[i] * ass->x0[i] + dr[i];
+   }
+}
+
+void SolverLin::kktcheck(double *dx, double *dv, double *ds, double *dr, double *b, double *c, int flag) {
+    double *r1 = new double[n];
+    double *r2 = new double[m];
+    double *r3 = new double[n];
+        this->kktopr(r1, r2, r3, dx, dv, ds);
+           ass->PrintVector(r1, n, "left rc");
+           ass->PrintVector(r2, m, "left rb");
+           ass->PrintVector(r3, n, "left rsx");
+        this->kktrhs(r1, r2, r3, dr, b, c, flag);
+           ass->PrintVector(r1, n, "right rc");
+           ass->PrintVector(r2, m, "right rb");
+           ass->PrintVector(r3, n, "right rsx");
+    delete [] r1;
+    delete [] r2;
+    delete [] r3;
 }
 
 void SolverLin::InnerPoint (double *x, double *v, double *s, double *b, double *c) {
@@ -236,14 +302,13 @@ void SolverLin::InnerPoint (double *x, double *v, double *s, double *b, double *
     minloss = dot_product(x, c, n);
     maxloss = dot_product(v, b, m);
 
+
     for (int iter = 0; iter < this->niter; iter ++) {
 
 	cout << endl << " ### iter = " << iter << "/" << niter << ", min loss =" << minloss << ", max loss =" << maxloss << endl;
 
 	// update parameters
         this->ModifyFuncPara (x, v, s);
-
-	if (iprint == 1){};
 
 	// predictor
         this->GetRhsPredictor(ru, rb, b, c);
@@ -270,6 +335,8 @@ void SolverLin::InnerPoint (double *x, double *v, double *s, double *b, double *
 
 	// preconditionging
         ass->Precon(dx, dv, ds, 0);
+
+        //this->kktcheck(dx, dv, ds, dr, b, c, 0);
 
 	// estimate dr from affine 
         this->EstimateDr (dr, dx, ds);
@@ -300,6 +367,8 @@ void SolverLin::InnerPoint (double *x, double *v, double *s, double *b, double *
            ass->PrintVector(ds, n, "ds");
 	}
 
+        // this->kktcheck(dx, dv, ds, dr, b, c, 1); exit(0);
+
 	// update variables
         this->UpdateXVS (x, v, s, dx, dv, ds);
 	if (iprint == 1) {
@@ -318,51 +387,6 @@ void SolverLin::InnerPoint (double *x, double *v, double *s, double *b, double *
         minloss = dot_product(x, c, n);
         maxloss = dot_product(v, b, m);
 
-	/*
-	iter_inn = 0;
-	dr = 1.0;
-	step /= beta;
-
-        cout << " --- --- outer = " << iter_out << "/" << outer << ", inner = 0/" << inner << ", step = " << step << ", mis=" << mis0 << endl;
-	exit(0);
-
-	while (dr > 0 && iter_inn < inner) {
-          iter_inn += 1;
-
-          VectorAdd (x1, x0, dx, 1.0, step, nm);
-	  //ass.Constraint(x1);
-	  if (iprint == 1) {
-	     cout << endl << " --- inner update x ---- " << endl;
-             exaio.printArray(x1, nm);
-	  }
-
-          ass.residual_aff(b1, x1);
-          mis1 = ass.misfit(x1);
-          r_x1 = norm2(b1, nm);
-          if (iprint == 1) {
-             cout << endl << " --- update residual ---- " << endl;
-             exaio.printArray(b1, nm);
-          }
-
-	  dr = r_x1 - (1.0 - alpha * step) * r_x0;
-          cout << " --- --- outer = " << iter_out << "/" << outer << ", inner = " << iter_inn << "/" << inner << ", step = " << step << " , mis=" << mis1 << ", r1/r0 = " << r_x1 << "/" << r_x0 << endl;
-          step = beta * step;
-
-        }
-
-	if (iter_out % 10 == 1 && iprint == 1) {
-	   cout << " --- outer update x ---- " << endl;
-           exaio.printArray(x1, nm);
-	}
-
-	// update ass.x0
-	ass.UpdateX (x1);
-	ass.maxres(&r1, &r2, b1);
-        r_perc = abs(r_x1 / r_x0 - 1.0);
-        //r_perc = abs(mis1 / mis0 - 1.0);
-	cout << " --- outer = " << iter_out << "/" << outer << " mis=" << mis1 << " r_perc = " << r_perc << " res()=" << r1 << " res(Ax-b)" << r2 << endl;
-
-*/
     }
 
     fp.close();
