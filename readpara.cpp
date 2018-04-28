@@ -185,6 +185,21 @@ void ReaderFileAss::readTargetFromFile () {
    inf.close();
 }
 
+void ReaderFileAss::setTarget (int flag) {
+   if (flag == 0) {
+      for (int imsg = 0; imsg < nmsg; imsg ++) {
+          this->target[imsg] = nusr / nmsg;
+          this->bottom[imsg] = 300.0;
+          this->upper[imsg] = nusr;
+      }
+   }
+   else {
+      srand((unsigned)time(NULL));
+      for (int i = 0; i < nmsg; i ++)
+          this->bottom[i] = 200.0 + 300.0 * rand()/(RAND_MAX + 1.0);
+   }
+}
+
 void ReaderFileAss::printScore () {
    for (int iusr = 0; iusr < nusr; iusr ++)
    for (int imsg = 0; imsg < nmsg; imsg ++) {

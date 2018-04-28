@@ -22,16 +22,17 @@ class SolverNle {
 	double epsilon, beta;
 	double step;
 
-	char *outputFileName;
+	string logFilename;
+	string outputFilename;
 
     public:
 	int nx, ne, ni;
 	ProAssign *ass;
 
-        SolverNle (ProAssign *, char *);
+        SolverNle (ProAssign *, string, string);
 	double GetInitStep(double *, double *);
 
-	void UpdateX(double *, double *);
+	void UpdateX(double *, double *, double *);
 	void UpdateV(double *, double *, double *, double *);
 	void AugLag (double *, double *, double *);
 	void GradientDescent(double *, double *, double *, double *, double *, double *, ofstream &);

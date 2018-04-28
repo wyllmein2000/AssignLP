@@ -4,9 +4,12 @@ using namespace std;
 
 /* -------------------------------------------------------------------
    -----------------------------------------------------------------*/
-ProAssign::ProAssign (double *score, double *bottom, int nusr, int nmsg) {
+ProAssign::ProAssign (double lambda, double *score, double *bottom, int nusr, int nmsg, string regulation) {
 
-   this->lambda = 0.0;
+   this->lambda = lambda;
+
+   /* "L1", "L2", "entropy" */
+   this->regulation = regulation;
 
    this->nusr = nusr;
    this->nmsg = nmsg;
@@ -25,20 +28,47 @@ ProAssign::ProAssign (double *score, double *bottom, int nusr, int nmsg) {
   
 void ProAssign::GetInitPoint (double *x, double *ce, double *cn) {
 
-   for (int i = 0; i < nx; i ++)
-       x[i] = 1.0 / this->nmsg;
+   if (this->regulation == "L2") {
+      for (int i = 0; i < nx; i ++)
+          x[i] = 1.0 / this->nmsg;
 
-   /*
-   for (int i = 0; i < nusr; i++) {
-       int k = i * nmsg;
-       for (int j = 0; j < nmsg; j ++) {
-	   x[k + j] = (1.66 * bot[j]) / nusr;
-       }
-   }*/
-   for (int i = 0; i < ne; i ++)
-       ce[i] = 0.1;	
-   for (int j = 0; j < ni; j ++)
-       cn[j] = 0.1;	
+      /*
+      for (int i = 0; i < nusr; i++) {
+          int k = i * nmsg;
+          for (int j = 0; j < nmsg; j ++) {
+	      x[k + j] = (1.66 * bot[j]) / nusr;
+          }
+      }*/
+      for (int i = 0; i < ne; i ++)
+          ce[i] = 0.1;	
+      for (int j = 0; j < ni; j ++)
+          cn[j] = 0.1;	
+   }
+   else if (this->regulation == "entropy") {
+
+      memset(ce, 0, ne * sizeof(double));
+      memset(cn, 0, ni * sizeof(double));
+
+      for (int i = 0; i < this->nusr; i ++) {
+          int k = i * this->nmsg;
+          double zi = 0.0;
+          double cc = 0.0;
+          for (int j = 0; j < this->nmsg; j ++) {
+              double c1 = (this->w[k + j] + cn[j]) / this->lambda;
+              if (cc < c1) cc = c1;
+          }
+          for (int j = 0; j < this->nmsg; j ++) {
+              x[k + j] = exp((this->w[k + j] + cn[j]) / this->lambda - cc);
+              zi += x[k + j];
+          }
+          for (int j = 0; j < this->nmsg; j ++) {
+              x[k + j] /= zi;
+	      if (x[k + j] < 1e-30) x[k + j] = 1e-30;
+	  }
+	 
+	  ce[i] = this->lambda * (1.0 - log(zi) + cc);
+      }
+   }
 }
 
 
@@ -77,26 +107,36 @@ void ProAssign::ComputeGradient(double *g, double *x, double *ce, double *cn, do
        for (int j = 0; j < nmsg; j ++) {
 	   m = k + j;
            g[m] = -w[m] - ce[i] - cn[j] + sigma * (ve[i] + vn[j] - s[j]);
-	   // maximum entropy
-	   // g[m] += this->lambda * (1.0 + log(x[m]));
-	   // minimum energy
-	   g[m] += this->lambda * x[m];
+       }
+       if (this->regulation == "L2") {
+          for (int j = 0; j < nmsg; j ++) {
+	      m = k + j;
+	      g[m] += this->lambda * x[m];
+	  }
+       }
+       else if (this->regulation == "entropy") { // maximum entropy
+          for (int j = 0; j < nmsg; j ++) {
+	      m = k + j;
+	      g[m] += this->lambda * (1.0 + log(x[m]));
+	  }
        }
    }
 }
 
-/*
-void ProAssign::UpdateX(double *x, double *dx, double alpha) {
-   for (int i = 0; i < this->nx; i++) {
-       x[i] -= alpha * dx[i];
-       if (x[i] < 0.0) x[i] = 0.0;
-   }
-}*/
-
 double ProAssign::Loss(double *x) {
    double y = 0.0;
    for (int i = 0; i < this->nx; i ++)
-       y += -1.0 * this->w[i] * x[i] + 0.5 * this->lambda * x[i] * x[i];
+       y += -1.0 * this->w[i] * x[i];
+   if (this->regulation == "L2") {
+      for (int i = 0; i < this->nx; i ++)
+          y += 0.5 * this->lambda * x[i] * x[i];
+   }
+   else if (this->regulation == "entropy") {
+      for (int i = 0; i < this->nx; i ++) {
+	  if (x[i] > 1e-30)
+             y += this->lambda * x[i] * log(x[i]);
+      }
+   }
    return y;
 }
 
@@ -117,16 +157,13 @@ double ProAssign::LossAug(double *x, double *ce, double *cn, double *ve, double 
 
 
 
-void ProAssign::round(double *y, double *x) {
+void ProAssign::round(double *y, double *x, int flag) {
     memset(y, 0, nusr * nmsg * sizeof(double));
     srand((unsigned)time(NULL));
-    this->WriteMatrix(x, nusr, nmsg, "output/msg_open_log");
-    int flag = 1;
     if (flag == 0) {
     for (int iusr = 0; iusr < nusr; iusr ++) {
 	int ks = iusr * nmsg;
-        //int kmsg = vector_max_index (&x[ks], nmsg);
-        int kmsg = vector_max_index (&y[ks], nmsg);
+        int kmsg = vector_max_index (&x[ks], nmsg);
         for (int imsg = 0; imsg < nmsg; imsg ++) {
             if (imsg == kmsg) 
 	       y[ks + imsg] = 1.0;
@@ -139,7 +176,9 @@ void ProAssign::round(double *y, double *x) {
     for (int iusr = 0; iusr < nusr; iusr ++) {
 	int ks = iusr * nmsg;
 	int imsg = 0;
-	while (ks >= 0) {
+	int jjj = 0;
+	// if (vector_max(&x[ks], nmsg) == 0.0) 
+	while (jjj < 10 * nmsg) {
 	    float r = rand()/(RAND_MAX + 1.0);
 	    if (imsg >= nmsg) 
 	       imsg = imsg - nmsg;
@@ -148,11 +187,11 @@ void ProAssign::round(double *y, double *x) {
 	       break;
 	    }
 	    imsg += 1;
+	    jjj += 1;
 	}
     }
     }
 
-    this->WriteMatrix(y, nusr, nmsg, "output/msg_open_log_r");
 }
 
 
@@ -213,11 +252,11 @@ void ProAssign::WriteMatrix(double *x, int m, int n, char *str) {
    fp.close();
 }
   
-void ProAssign::printResult(string outputFileName, double *x0, double *x) {
+void ProAssign::printResult(string outputFilename, double *x0, double *x, int flag) {
 
-    double e0, y0;
-    double entropy, yield;
-    double entropy_r, yield_r;
+    double e0, y0, loss0;
+    double entropy, yield, loss;
+    double entropy_r, yield_r, loss_r;
     double s_x0, s_x, s_xr;
     double r1, r2;
 
@@ -231,21 +270,39 @@ void ProAssign::printResult(string outputFileName, double *x0, double *x) {
     this->flow(a0, x0);
     //e0 = this->entropy(a0, nmsg);
     y0 = this->yield(x0);
+    loss0 = this->Loss(x0);
     s_x0 = vector_sum(a0, nmsg);
 
     // solved x
+    this->flow(a0, x0);
     this->flow(actual, x);
     //entropy = this->entropy(actual, nmsg);
     yield = this->yield(x);
+    loss = this->Loss(x);
     s_x = vector_sum(actual, nmsg);
 
 
     // round
-    this->round(xr, x);
+    if (flag <= 0)
+       this->round(xr, x, 0);
+    else {
+       double tbeg = time(NULL);
+       this->round(xr, x, 1);
+       double tend = time(NULL);
+       double durationTime = (double)difftime(tend, tbeg);
+       cout << " round cost: " << durationTime << " sec" << endl;
+    }
     this->flow(actual_r, xr);
     //entropy_r = this->entropy(actual_r, nmsg);
     yield_r = this->yield(xr);
+    loss_r = this->Loss(xr);
     s_xr = vector_sum(actual_r, nmsg);
+
+    if (flag % 10 == 0) {
+       this->WriteMatrix(x, nusr, nmsg, "output/msg_open_log");
+       this->WriteMatrix(xr, nusr, nmsg, "output/msg_open_log_r");
+    }
+
 
     // average score
     memset(avsc, 0, nmsg * sizeof(double));
@@ -254,30 +311,35 @@ void ProAssign::printResult(string outputFileName, double *x0, double *x) {
         avsc[j] += this->w[i * nmsg + j];
 
     cout << endl;
-    cout << " --- final x ---- " << endl;
     //exaio.printArray(x1, nm);
 
     //ofstream fp(outputFileName.c_str(), ios::app);
-    ofstream fp(outputFileName, ios::app);
+    ofstream fp(outputFilename, ios::app);
    // if (fp) {
+      fp << " ALM " << endl;
+      fp << " regulation = " << this->regulation << endl;
       fp << " nusr = " << nusr << endl;
       fp << " nmsg = " << nmsg << endl;
       fp << " lambda = " << lambda << endl;
+      fp << " iter = " << flag << endl;
       fp << " flow for each msg: " << endl;
       for (int i = 0; i < nmsg; i ++) {
 	  fp << setw(10) << i << setw(10) << a0[i] << setw(10) << actual[i] << setw(10) << actual_r[i] << setw(10) << this->bot[i] << setw(10) << avsc[i] << endl;
       }
       fp << setw(10) << "sum" << setw(10) << s_x0 << setw(10) << s_x << setw(10) << s_xr << setw(10) << " " << setw(10) << " " << endl;
       fp << setw(10) << "yield " << setw(10) << y0 << " " << yield << " " << yield_r << endl;
+      fp << setw(10) << " loss " << setw(10) << loss0 << " " << loss << " " << loss_r << endl;
       //fp << setw(10) << "entropy " << setw(10) << e0 << " " << entropy << " " << entropy_r << endl;
       fp << endl;
       fp.close();
   //  }
 
+
     delete [] xr;
     delete [] a0;
     delete [] actual;
     delete [] actual_r;
+    delete [] avsc;
 }
 
 

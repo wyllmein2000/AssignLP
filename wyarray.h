@@ -1,5 +1,5 @@
-#ifndef ARRAY_H
-#define ARRAY_H
+#ifndef WYARRAY_H
+#define WYARRAY_H
 
 #include <stdio.h>
 
@@ -12,8 +12,9 @@ double norm2 (double *x, int n);
 
 
 int vector_max_index (double *x, int n);
-double vector_amax (double *, int);
 double vector_min (double *x, int n);
+double vector_max (double *x, int n);
+double vector_amax (double *, int);
 double vector_sum (double *a, int n);
 double dot_product (double *, double *, int);
 double dot2_product(double **x, double **y, int m, int n);

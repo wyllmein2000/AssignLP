@@ -7,8 +7,8 @@
 #include <iostream>
 #include <iomanip>
 #include <cstring>
-/*
 #include <cmath>
+/*
 #include <stdlib.h>
 #include <set>
 #include <map>
@@ -26,7 +26,9 @@ class ProAssign {
         double lambda;  
 	double *w, *bot;
 
-        ProAssign (double *, double *, int, int);
+	string regulation;
+
+        ProAssign (double, double *, double *, int, int, string);
 
 	void GetInitPoint (double *, double *, double *);
         void ComputeConstraint(double *, double *, double *);
@@ -36,7 +38,7 @@ class ProAssign {
         double Loss (double *);
         double LossAug (double *, double *, double *, double *, double *, double *, double);
 
-	void round(double *, double *);
+	void round(double *, double *, int);
 	void flow(double *, double *);
 	double yield(double *);
 	double misfit(double *);
@@ -44,7 +46,7 @@ class ProAssign {
         void PrintVector(double *, int, char *str);
         void PrintMatrix(double *, int, int, char *str);
         void WriteMatrix(double *, int, int, char *str);
-	void printResult(string, double *, double *);
+	void printResult(string, double *, double *, int);
 	void Free ();
 };
 #endif

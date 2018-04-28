@@ -33,6 +33,7 @@ class ReaderFileAss {
         void getDataDimension ();
         void readScoreFromFile ();
 	void readTargetFromFile ();
+	void setTarget (int);
         void printScore ();
         void printTarget ();
 	void free ();

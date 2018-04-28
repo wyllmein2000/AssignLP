@@ -61,6 +61,13 @@
    return y;
 }
 // ===================================================================
+   double vector_max (double *x, int n) {
+   double y=x[0];
+   for (int i=1; i<n; i++)
+       if (y<x[i]) y=x[i];
+   return y;
+}
+// ===================================================================
    double vector_amax (double *x, int n) {
    double y=x[0];
    for (int i=1; i<n; i++)

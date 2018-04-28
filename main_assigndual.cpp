@@ -4,8 +4,7 @@
 #include "inout.h"
 #include "readpara.h"
 #include "wyarray.h"
-#include "proassign.h"
-#include "solvernle.h"
+#include "solver_assign_dual.h"
 using namespace std;
 
 
@@ -20,23 +19,24 @@ int main (int argc, char **argv) {
     //string scoreFileName("data/u2p_score_0412.txt");
     //string targetFileName("data/u2p_target_0412.txt");
       
+    //string fileName("data/usr2msg_score_0319_p10msg.txt");
+      
     /*
     int maxLine = 16070;   // 17 msgs, 1000 users
     //int maxLine = 1991;   // 2 msgs, 1000 users
     string scoreFileName("data/u2p_score_0319.txt");
     string targetFileName("data/u2p_target_0319.txt");
-    string logFilename("output/u2p_0319_log.txt");
-    string outFilename("output/u2p_0319_result.txt");
+    string logFilename("output/u2p_dual0319_log.txt");
+    string outFilename("output/u2p_dual0319_result.txt");
     */
 
     //
     int maxLine = 5089149;  // 391 msgs, 370498 users
     string scoreFileName("data/u2p_score_0424.txt");
     string targetFileName("data/u2p_target_0424.txt");
-    string logFilename("output/u2p_0424_log.txt");
-    string outFilename("output/u2p_0424_result.txt");
+    string logFilename("output/u2p_0424_dual_0_log.txt");
+    string outFilename("output/u2p_0424_dual_0_result.txt");
     //
-
 
     /* read parameters from file */
     ReaderFileAss *rdf = new ReaderFileAss(scoreFileName, targetFileName, maxLine); 
@@ -45,33 +45,25 @@ int main (int argc, char **argv) {
     //rdf->readTargetFromFile ();
     rdf->setTarget (0);
     //rdf->printScore();
-    //rdf->printTarget();
+    rdf->printTarget();
     //exit(0);
 
-    int nx = rdf->nusr * rdf->nmsg;
-
-    // define the specific problem
-    ProAssign *ass = new ProAssign(0.001, rdf->score, rdf->bottom, rdf->nusr, rdf->nmsg, "entropy");
+    int nusr = rdf->nusr;
+    int nmsg = rdf->nmsg;
+    int nx = nusr * nmsg;
 
     // define varibles
     double *x = new double[nx];
-    double *ce = new double[rdf->nusr];
-    double *cn = new double[rdf->nmsg];
 
     // define the solver
-    SolverNle *sol = new SolverNle(ass, outFilename, logFilename);
+    SolverAssDual *sol = new SolverAssDual(rdf->score, rdf->bottom, nusr, nmsg);
+    sol->SetFilename(outFilename, logFilename);
 
     // run the solver
-    sol->AugLag (x, ce, cn);
+    sol->GradientDescent (x);
 
-
-
-
-
-    // finished ...
     double stop = time(NULL);
     double durationTime = (double)difftime(stop, start);
-
     if (durationTime < 60)
        cout << endl << "Cost：" << durationTime << " sec" << endl;
     else if (durationTime < 3600)
@@ -88,6 +80,6 @@ int main (int argc, char **argv) {
        fp << "Cost：" << durationTime/3600.0 << " hour" << endl;
     fp.close();
 
-
+    delete [] x;
     rdf->free();
 }

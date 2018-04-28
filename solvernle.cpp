@@ -25,7 +25,7 @@
 
 
 
-SolverNle::SolverNle (ProAssign *ass, char *fo) {
+SolverNle::SolverNle (ProAssign *ass, string fo, string log) {
     this->niter = 200;
     this->outer = 100;
     this->inner = 10;
@@ -38,13 +38,14 @@ SolverNle::SolverNle (ProAssign *ass, char *fo) {
     this->alpha = 2.0;
     this->step = 1.0;
 
-    this->epsilon = 1e-09;
+    this->epsilon = 1e-06;
     //this->beta = 0.25;
     this->beta = 0.5;
 
     this->iprint = 0;
     this->ass = ass;
-    this->outputFileName = fo;
+    this->outputFilename = fo;
+    this->logFilename = log;
 
     this->nx = ass->nx;
     this->ne = ass->ne;
@@ -62,10 +63,10 @@ double SolverNle::GetInitStep (double *dx, double *dx_old) {
     return 0.01 * s1 / (s2 + 1e-30);
 }
 
-void SolverNle::UpdateX(double *x, double *dx) {
+void SolverNle::UpdateX(double *x, double *x0, double *dx) {
     for (int i = 0; i < this->nx; i ++) {
-	x[i] -= this->step * dx[i];
-	if (x[i] < 0.0) x[i] = 0.0;
+	x[i] = x0[i] - this->step * dx[i];
+	if (x[i] < 1e-30) x[i] = 1e-30;
     }    
 }
 
@@ -80,6 +81,8 @@ void SolverNle::UpdateV(double *ce, double *cn, double *ve, double *vn) {
 }
 
 void SolverNle::AugLag (double *x, double *ce, double *cn) {
+
+    double *x0 = new double[nx];
     double *ve = new double[ne];
     double *vn = new double[ni];
     double *vs = new double[ni];
@@ -90,10 +93,11 @@ void SolverNle::AugLag (double *x, double *ce, double *cn) {
     double loss;
 
     // create an output file
-    ofstream fp(outputFileName);
+    ofstream fp(logFilename);
 
     // get initial value 
     ass->GetInitPoint(x, ce, cn);
+    memcpy(x0, x, nx * sizeof(double));
     //ass->PrintVector(x, nx, "Init x");
 
     ass->ComputeConstraint(ve, vn, x);
@@ -130,6 +134,9 @@ void SolverNle::AugLag (double *x, double *ce, double *cn) {
 	ce_norm_old = ce_norm;
 	cn_norm_old = cn_norm;
 
+	ass->printResult(outputFilename, x0, x, iter);
+
+
     }
 
     //ass->PrintVector(x, nx, " Update X");
@@ -139,6 +146,7 @@ void SolverNle::AugLag (double *x, double *ce, double *cn) {
     cout << endl;
     cout << " --- final x ---- " << endl;
     
+    delete [] x0;
     delete [] ve;
     delete [] vn;
     delete [] vs;
@@ -168,6 +176,11 @@ void SolverNle::GradientDescent (double *x, double *ce, double *cn, double *ve, 
 	ass->ComputeSlash(s, cn, vn, this->sigma);
 	ass->ComputeGradient(dx, x, ce, cn, ve, vn, s, this->sigma);
         mis = ass->LossAug(x, ce, cn, ve, vn, s, this->sigma);
+	/*
+	cout << " mis=" << mis << endl;
+	    for (int i = 0; i < nx; i ++)
+		    cout << "i=" << i << ", dx=" << dx[i] << endl;
+		    */
 
 	//if (this->flag > 0) {
 	//if (this->flag == 2 && iter == 0) {
@@ -192,7 +205,7 @@ void SolverNle::GradientDescent (double *x, double *ce, double *cn, double *ve, 
 	fp << " * iter = " << iter << "/" << this->outer << ", jter = 0/" << this->inner << ", step = " << this->step << ", aug loss = " << mis << endl;
 
 	for (int jter = 0; jter < this->inner; jter ++) {
-            this->UpdateX (x, dx);
+            this->UpdateX (x, x0, dx);
 	    ass->ComputeConstraint(ve, vn, x);
 	    ass->ComputeSlash(s, cn, vn, this->sigma);
             loss = ass->LossAug(x, ce, cn, ve, vn, s, this->sigma); 
@@ -238,6 +251,7 @@ void SolverNle::GradientDescent (double *x, double *ce, double *cn, double *ve, 
 
     delete [] dx_old;
     delete [] dx;
+    delete [] x0;
     delete [] dce;
     delete [] dcn;
 }
